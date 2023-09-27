@@ -1,0 +1,93 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - "main"
+  # pull_request:
+  #   branches:
+  #     - "main"
+
+  workflow_dispatch:
+
+env:
+  flutterVersion: ${{ vars.FLUTTER_VERSION }}
+  buildNumber: 1
+  # buildName: env.BUILD_NAME
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # fetches all history so that we can create a tag
+          fetch-depth: 0
+
+      - name: Set build number
+        uses: ./.github/actions/versioning
+        with:
+          tag-name-prefix: "money_mind"
+
+      - name: Install Flutter ${{ env.flutterVersion }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "${{ env.flutterVersion }}"
+          channel: "stable"
+
+      - name: Check Flutter version
+        run: |
+          flutter --version
+          yes | flutter doctor --android-licenses
+          flutter doctor -v
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # - name: Flutter analyze
+      #   run: flutter analyze --no-fatal-infos --no-fatal-warnings |& tee analysis.txt
+
+      - name: Flutter build apk
+        run: flutter build apk --release --build-name 1.0.${{ env.NEW_BUILD_VERSION }}
+
+      - name: Export build as artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: money_mind_apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload apk to Firebase
+        uses: ./.github/actions/firebase_app_distribution
+        with:
+          path: build/app/outputs/flutter-apk/app-release.apk
+          app: ${{ secrets.APP_ID }}
+          serviceAccountJSON: ${{ secrets.GOOGLE_SERVICE_JSON }}
+          group: internal-testers
+
+      # - name: Create release
+      #   run: |
+      #     # init git
+      #     git config --local user.email "garten_arbeit@berkkan.bot.de"
+      #     git config --local user.name "github-actions[bot]"
+
+      #     # create tag
+      #     GITTAG=$(git tag -l "v*")
+      #     echo $GITTAG
+      #     IFS=$'\n' sorted=($(sort -V <<<"${GITTAG[*]}")); unset IFS
+      #     GITTAG=${sorted[${#sorted[@]}-1]}
+      #     echo $GITTAG
+      #     BUILD_VERSION=${GITTAG##v}
+      #     echo $BUILD_VERSION
+      #     NEW_BUILD_VERSION=$(($BUILD_VERSION + 1))
+      #     echo $NEW_BUILD_VERSION
+      #     git tag v$NEW_BUILD_VERSION
+      #     git push origin v$NEW_BUILD_VERSION
+      #     git push --delete origin $GITTAG
+      #     echo "NEW_BUILD_VERSION=$NEW_BUILD_VERSION" >> $GITHUB_ENV
+
+      #     # git tag -a v1.0.0 -m "My first release"
+      #     # git push origin v1.0.0
+
+      #     # # create release
+      #     # gh release create v1.0.0 -t "My first release" -F release_notes.txt
