@@ -49,7 +49,7 @@ jobs:
       #   run: flutter analyze --no-fatal-infos --no-fatal-warnings |& tee analysis.txt
 
       - name: Flutter build apk
-        run: flutter build apk --release --build-name 1.0.${{ env.NEW_BUILD_VERSION }} --build-number ${{ env.NEW_BUILD_VERSION }}
+        run: flutter build apk --release --build-name 1.0.${{ env.NEW_BUILD_VERSION }}
 
       - name: Export build as artifacts
         uses: actions/upload-artifact@v2
